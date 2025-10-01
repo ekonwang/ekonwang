@@ -11,21 +11,36 @@ permissions:
 jobs:
   keepalive:
     runs-on: ubuntu-latest
+    env:
+      SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
     steps:
-      - name: Checkout
+      - name: Checkout main branch
         uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Ensure on main branch
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout -B main origin/main
 
       - name: Make daily commit
         run: |
           set -euo pipefail
           echo "Run at: $(date -u +"%Y-%m-%dT%H:%M:%SZ")" | tee -a .keepalive.log
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           echo "$(date -u +"%F %T")Z ${GITHUB_RUN_NUMBER}" >> .keepalive
           git add .keepalive .keepalive.log || true
           git commit -m "chore: daily keepalive $(date -u +"%F") [skip ci]" || echo "No changes to commit"
-          # Push to default branch (main) or current ref
-          git push origin "${GITHUB_REF_NAME:-main}" || git push
+          # Push to main branch explicitly
+          git push origin HEAD:main
 
       - name: Prepare run log
         run: |
@@ -44,18 +59,21 @@ jobs:
           } > run.log
 
       - name: Send email with run log
-        if: always()
+        if: ${{ always() && env.SMTP_SERVER != '' && env.SMTP_USERNAME != '' && env.SMTP_PASSWORD != '' && env.SMTP_PORT != '' }}
         uses: dawidd6/action-send-mail@v3
         with:
-          server_address: ${{ secrets.SMTP_SERVER }}
-          server_port: ${{ secrets.SMTP_PORT }}
-          username: ${{ secrets.SMTP_USERNAME }}
-          password: ${{ secrets.SMTP_PASSWORD }}
+          server_address: ${{ env.SMTP_SERVER }}
+          server_port: ${{ env.SMTP_PORT }}
+          username: ${{ env.SMTP_USERNAME }}
+          password: ${{ env.SMTP_PASSWORD }}
           subject: "Daily keepalive #${{ github.run_number }} on ${{ github.repository }}"
           to: "g1547246193@gmail.com"
-          from: "GitHub Actions <no-reply@github.com>"
+          from: ${{ env.SMTP_USERNAME }}
           secure: true
           content_type: text/plain
           body: file://run.log
-        continue-on-error: true
 
+      - name: Skip email (missing SMTP secrets)
+        if: ${{ always() && (env.SMTP_SERVER == '' || env.SMTP_USERNAME == '' || env.SMTP_PASSWORD == '' || env.SMTP_PORT == '') }}
+        run: |
+          echo "Email step skipped: SMTP secrets are not fully configured."
