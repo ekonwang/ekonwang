@@ -1,6 +1,6 @@
 # Hello, folks! 👋
 
-I’m Yikun Wang (Aaron), a Ph.D. student at Fudan University (SII Joint Program) working on large language models and multimodality.
+I’m Yikun Wang, a Ph.D. student at Fudan University (SII Joint Program) working on large language models and multimodality.
 
 - 🚀 Vision: <strong>Let’s explore the AI agent world!</strong>
 - 🔭 Focus: vision–language models, alignment, robustness, reasoning
